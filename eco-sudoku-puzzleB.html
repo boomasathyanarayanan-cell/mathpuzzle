@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eco‑Sudoku — Sustainability Meets Logic</title>
+  <style>
+    :root{
+      --sky:#87CEEB;
+      --sky-2:#d9f3ff;
+      --gold:#FFD700;
+      --ink:#0b3142;
+      --leaf:#2e7d32;
+      --card:#ffffff;
+      --error:#c62828;
+      --ok:#1b5e20;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: "Segoe UI", Roboto, system-ui, -apple-system, Arial, sans-serif;
+      background: linear-gradient(135deg, var(--sky) 0%, var(--sky-2) 65%);
+      color:var(--ink);
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:12px;
+    }
+    header{
+      width: min(1200px, 95vw);
+      background:linear-gradient(90deg, var(--gold), #ffe567);
+      border-radius:18px; padding:14px 18px; margin-top:14px;
+      box-shadow:0 8px 24px rgba(0,0,0,.12);
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    }
+    header h1{margin:0; font-size: clamp(22px, 3vw, 34px); letter-spacing:.3px}
+    header .sub{font-size: clamp(12px, 1.6vw, 16px); opacity:.9}
+
+    .wrap{
+      width:min(1200px, 95vw); display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; align-items:start;
+    }
+    @media (max-width: 980px){ .wrap{ grid-template-columns: 1fr; } }
+
+    .card{
+      background:var(--card); border-radius:18px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.12);
+    }
+    .toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px }
+    .btn{
+      border:none; background:var(--ink); color:white; padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600;
+      box-shadow:0 6px 16px rgba(0,0,0,.14); transition: transform .06s ease, opacity .2s ease;
+    }
+    .btn:hover{ transform: translateY(-1px) }
+    .btn.secondary{ background:var(--leaf) }
+    .btn.warn{ background:var(--error) }
+    .btn.ghost{ background:#134b61; opacity:.85 }
+
+    .legend{ display:flex; gap:10px; flex-wrap:wrap; align-items:center }
+    .token{
+      display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; font-size:28px; border-radius:12px;
+      background:#f4fbff; border:2px dashed #a0c8d6; cursor:grab; user-select:none;
+    }
+
+    .grid{ width:100%; aspect-ratio:1/1; background:#fefefe; border-radius:16px; overflow:hidden; border:4px solid var(--gold); }
+    .grid table{ width:100%; height:100%; border-collapse:collapse; table-layout:fixed }
+    .grid td{
+      border:1px solid #d2e7ef; text-align:center; font-size:30px; position:relative; background:white;
+    }
+    .grid td.locked{ background:#fff7d0; font-weight:700 }
+    .grid td.drop{ outline:3px dashed #4aa3c1; outline-offset:-3px; }
+
+    .grid td{ border-right:1px solid #cfe7f0; border-bottom:1px solid #cfe7f0 }
+    .grid tr:nth-child(2n) td{ border-bottom:3px solid var(--gold) }
+    .grid td:nth-child(3n){ border-right:3px solid var(--gold) }
+
+    .hint{ font-size:12px; opacity:.85 }
+
+    .side h3{ margin-top:0 }
+    .facts, .leader, .pledges{ display:flex; flex-direction:column; gap:10px }
+    .fact, .challenge{
+      background:#f8fdff; border:1px solid #d3eef7; border-left:6px solid var(--leaf); padding:10px; border-radius:12px;
+    }
+
+    .notice{ font-size:13px; opacity:.8 }
+
+    .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; padding:16px; }
+    .modal.active{ display:flex }
+    .modal .box{ background:white; border-radius:16px; padding:18px; max-width:720px; width:min(92vw, 720px); box-shadow:0 14px 48px rgba(0,0,0,.25) }
+    .box h2{ margin-top:0 }
+
+    .qr{
+      display:flex; align-items:center; gap:12px; background:#fffbe6; border:1px dashed #e0c200; padding:10px; border-radius:12px;
+    }
+    .qr .square{ width:96px; height:96px; background:repeating-linear-gradient(45deg, #000, #000 8px, #fff 8px, #fff 16px); border-radius:8px }
+    .qr a{ font-weight:700; color:#004b6b }
+
+    .input, input[type="text"]{ padding:10px 12px; border-radius:10px; border:1px solid #b9dbe7; width:100% }
+    .table{ width:100%; border-collapse:collapse }
+    .table th,.table td{ padding:8px 10px; border-bottom:1px solid #edf5f8; text-align:left }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Eco‑Sudoku — Sustainability Meets Logic</h1>
+      <div class="sub">6×6 eco‑icon Sudoku • Sky Blue & Golden • Innovista playable booth</div>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="checkBtn">Check</button>
+      <button class="btn secondary" id="hintBtn">Hint</button>
+      <button class="btn ghost" id="resetBtn">Reset</button>
+      <button class="btn warn" id="clearErrorsBtn">Clear Errors</button>
+      <span class="hint">Tip: drag icons into empty cells. Right‑click a cell to clear.</span>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="card">
+      <div class="legend" id="palette" aria-label="Icon palette"></div>
+      <div class="grid" aria-label="Eco‑Sudoku grid">
+        <table id="board" role="grid" aria-rowcount="6" aria-colcount="6"></table>
+      </div>
+      <div class="toolbar" style="margin-top:10px">
+        <div><strong>Timer:</strong> <span id="timer">00:00</span></div>
+        <div><strong>Mistakes:</strong> <span id="mistakes">0</span></div>
+      </div>
+    </section>
+
+    <aside class="side card">
+      <h3>About this model</h3>
+      <p class="notice">Complete the puzzle to unlock an eco‑fact and a community challenge. Use the QR Mission Board to log your pledge. Leaderboard saves to this device (local only).</p>
+
+      <div class="facts">
+        <div class="fact" id="sampleFact">💡 Eco‑Fact (sample): Turning off the tap while brushing can save ~6 liters per minute.</div>
+        <div class="challenge" id="sampleChallenge">🌱 Community Challenge (sample): Bring a reusable bottle to school all week.</div>
+      </div>
+
+      <div class="card" style="margin-top:10px">
+        <h3>QR Mission Board</h3>
+        <div class="qr">
+          <div class="square" aria-hidden="true"></div>
+          <div>
+            <div><strong>Scan or click:</strong> Log your eco‑pledge / action</div>
+            <a id="qrLink" href="#" target="_blank" rel="noopener">Open Mission Board</a>
+            <div class="notice">Teacher: replace this link via the ⚙️ button below.</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <input type="text" id="qrInput" placeholder="Paste your Google Form / Padlet link here" />
+          <button class="btn" id="saveQr">⚙️ Set Link</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:10px">
+        <h3>Leaderboard</h3>
+        <div style="display:flex; gap:8px; margin-bottom:8px">
+          <input type="text" id="playerName" placeholder="Your name" />
+          <button class="btn secondary" id="saveScore">Save Time</button>
+        </div>
+        <table class="table" id="scores">
+          <thead><tr><th>#</th><th>Name</th><th>Time</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top:10px">
+        <h3>Pledge Wall</h3>
+        <div style="display:flex; gap:8px; margin-bottom:8px">
+          <input type="text" id="pledgeText" placeholder="I pledge to…" />
+          <button class="btn" id="addPledge">Add</button>
+        </div>
+        <ul id="pledges" class="pledges" style="list-style:none; padding-left:0; margin:0"></ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="box">
+      <h2>🎉 Eco‑Sudoku Completed!</h2>
+      <p id="finalFact"><strong>Eco‑Fact:</strong> …</p>
+      <p id="finalChallenge"><strong>Community Challenge:</strong> …</p>
+      <div class="qr" style="margin:10px 0">
+        <div class="square" aria-hidden="true"></div>
+        <div>
+          <div><strong>Log your action:</strong> Open the Mission Board</div>
+          <a id="qrLink2" href="#" target="_blank" rel="noopener">Open Mission Board</a>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end">
+        <button class="btn ghost" id="closeModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ICONS = ["🌳","💧","☀️","♻️","🍃","🐝"]; 
+    const SOL_NUM = [
+      [1,2,3,4,5,6],
+      [4,5,6,1,2,3],
+      [2,3,1,5,6,4],
+      [5,6,4,2,3,1],
+      [3,1,2,6,4,5],
+      [6,4,5,3,1,2]
+    ];
+    const GIVENS = [[0, 2, 3], [0, 4, 5], [1, 0, 4], [1, 3, 1], [1, 5, 3], [2, 1, 3], [2, 5, 4], [3, 0, 5], [3, 2, 1], [3, 4, 6], [4, 1, 4], [4, 3, 2], [5, 0, 6], [5, 4, 1]];
+
+    let mistakes = 0;
+    let startTime = Date.now();
+    let timerId = null;
+
+    const board = document.getElementById('board');
+    const palette = document.getElementById('palette');
+    const mistakesEl = document.getElementById('mistakes');
+    const timerEl = document.getElementById('timer');
+
+    function mapNumToIcon(n){ return ICONS[n-1]; }
+    function mapIconToNum(icon){ return ICONS.indexOf(icon)+1; }
+
+    function buildPalette(){
+      ICONS.forEach((ico)=>{
+        const el = document.createElement('div');
+        el.className='token';
+        el.draggable=true; el.textContent=ico; el.title='Drag to a cell';
+        el.addEventListener('dragstart', e=>{
+          e.dataTransfer.setData('text/plain', ico);
+        });
+        palette.appendChild(el);
+      });
+    }
+
+    function buildBoard(){
+      board.innerHTML='';
+      for(let r=0;r<6;r++){
+        const tr=document.createElement('tr');
+        for(let c=0;c<6;c++){
+          const td=document.createElement('td');
+          td.dataset.r=r; td.dataset.c=c;
+          td.addEventListener('dragover', e=>{ e.preventDefault(); td.classList.add('drop'); });
+          td.addEventListener('dragleave', ()=> td.classList.remove('drop'));
+          td.addEventListener('drop', e=>{
+            e.preventDefault(); td.classList.remove('drop');
+            if(td.classList.contains('locked')) return;
+            const ico = e.dataTransfer.getData('text/plain');
+            td.textContent = ico; td.dataset.v = mapIconToNum(ico);
+          });
+          td.addEventListener('contextmenu', e=>{ e.preventDefault(); if(!td.classList.contains('locked')){ td.textContent=''; delete td.dataset.v; td.style.background='white'; }});
+          tr.appendChild(td);
+        }
+        board.appendChild(tr);
+      }
+      for(const [r,c,v] of GIVENS){
+        const td = board.rows[r].cells[c];
+        td.textContent = mapNumToIcon(v);
+        td.dataset.v = v;
+        td.classList.add('locked');
+      }
+    }
+
+    function formatTime(ms){
+      const s=Math.floor(ms/1000); const m=Math.floor(s/60); const rem=s%60; 
+      return `${String(m).padStart(2,'0')}:${String(rem).padStart(2,'0')}`
+    }
+    function startTimer(){
+      startTime = Date.now();
+      clearInterval(timerId);
+      timerId = setInterval(()=>{ timerEl.textContent = formatTime(Date.now()-startTime); }, 250);
+    }
+
+    function gridToNums(){
+      const arr=[...Array(6)].map(()=>Array(6).fill(0));
+      for(let r=0;r<6;r++) for(let c=0;c<6;c++){
+        const v = board.rows[r].cells[c].dataset.v;
+        arr[r][c] = v? Number(v):0;
+      }
+      return arr;
+    }
+
+    function validate(showMarks=true){
+      let ok=true; const arr=gridToNums();
+      for(let r=0;r<6;r++) for(let c=0;c<6;c++){
+        const td=board.rows[r].cells[c]; if(!td.classList.contains('locked')) td.style.background='white';
+      }
+      const markBad=(r,c)=>{ const td=board.rows[r].cells[c]; if(!td.classList.contains('locked') && showMarks){ td.style.background="#ffe0e0"; }}
+
+      for(let r=0;r<6;r++){
+        const seen=new Set();
+        for(let c=0;c<6;c++){
+          const v=arr[r][c]; if(v===0){ ok=false; continue; }
+          if(seen.has(v)){ ok=false; markBad(r,c); }
+          seen.add(v);
+        }
+      }
+      for(let c=0;c<6;c++){
+        const seen=new Set();
+        for(let r=0;r<6;r++){
+          const v=arr[r][c]; if(v===0){ ok=false; continue; }
+          if(seen.has(v)){ ok=false; markBad(r,c); }
+          seen.add(v);
+        }
+      }
+      for(let br=0;br<6;br+=2){
+        for(let bc=0;bc<6;bc+=3){
+          const seen=new Set();
+          for(let r=br;r<br+2;r++) for(let c=bc;c<bc+3;c++){
+            const v=arr[r][c]; if(v===0){ ok=false; continue; }
+            if(seen.has(v)){ ok=false; markBad(r,c); }
+            seen.add(v);
+          }
+        }
+      }
+      return ok;
+    }
+
+    function giveHint(){
+      const empties=[]; const wrong=[];
+      for(let r=0;r<6;r++) for(let c=0;c<6;c++){
+        const td=board.rows[r].cells[c];
+        if(td.classList.contains('locked')) continue;
+        const cur=td.dataset.v? Number(td.dataset.v):0;
+        const correct = SOL_NUM[r][c];
+        if(cur===0) empties.push([r,c]);
+        else if(cur!==correct) wrong.push([r,c]);
+      }
+      const pool = empties.length? empties : wrong;
+      if(!pool.length) return;
+      const [r,c] = pool[Math.floor(Math.random()*pool.length)];
+      const td=board.rows[r].cells[c];
+      td.textContent = ICONS[SOL_NUM[r][c]-1];
+      td.dataset.v = SOL_NUM[r][c];
+      td.style.background="#e8ffe8";
+    }
+
+    function clearErrors(){
+      for(let r=0;r<6;r++) for(let c=0;c<6;c++){
+        const td=board.rows[r].cells[c]; if(!td.classList.contains('locked')) td.style.background='white';
+      }
+    }
+
+    function check(){
+      const ok = validate(true);
+      if(ok){ onComplete(); }
+      else { mistakes++; document.getElementById('mistakes').textContent = String(mistakes); }
+    }
+
+    const FACTS = [
+      "A mature tree absorbs ~48 lbs (≈22 kg) of CO₂ per year.",
+      "LED bulbs use up to 85% less energy than incandescent.",
+      "Turning off the tap while brushing can save 6 liters per minute.",
+      "Recycling one aluminum can saves enough energy to run a TV for 3 hours.",
+      "Nearly 30% of household waste is compostable food scraps.",
+      "Air‑drying clothes can cut dryer energy use by 100%.",
+      "Planting native species supports local pollinators like bees and butterflies.",
+      "Keeping tires properly inflated improves mileage and reduces CO₂.",
+      "Phantom power from idle devices can add 5–10% to electricity use.",
+      "Refilling a bottle 20× keeps ~1 kg of plastic out of landfills.",
+      "Every 1°C higher on your AC can save ~7% electricity.",
+      "Wetlands store carbon up to 5× faster than forests in some regions."
+    ];
+    const CHALLENGES = [
+      "Bring a reusable bottle all week.",
+      "Plant a seed or sapling this weekend.",
+      "Sort your waste: recycle, compost, landfill.",
+      "Take a 2‑minute shorter shower today.",
+      "Unplug idle chargers and devices tonight.",
+      "Carry a cloth bag for shopping.",
+      "Use stairs for one trip instead of the elevator.",
+      "Switch one light to LED at home.",
+      "Start a mini herb garden in a reused container.",
+      "Share one eco‑tip with a friend.",
+      "Bring a waste‑free snack to school.",
+      "Pick up five pieces of litter (safely)."
+    ];
+
+    function onComplete(){
+      clearInterval(timerId);
+      const fact = FACTS[Math.floor(Math.random()*FACTS.length)];
+      const chal = CHALLENGES[Math.floor(Math.random()*CHALLENGES.length)];
+      document.getElementById('finalFact').innerHTML = `<strong>Eco‑Fact:</strong> ${fact}`;
+      document.getElementById('finalChallenge').innerHTML = `<strong>Community Challenge:</strong> ${chal}`;
+      document.getElementById('modal').classList.add('active');
+      document.getElementById('sampleFact').textContent = `💡 Eco‑Fact: ${fact}`;
+      document.getElementById('sampleChallenge').textContent = `🌱 Community Challenge: ${chal}`;
+    }
+
+    const qrLink = document.getElementById('qrLink');
+    const qrLink2 = document.getElementById('qrLink2');
+    const qrInput = document.getElementById('qrInput');
+    const saveQr = document.getElementById('saveQr');
+    const QR_KEY = 'ecoSudokuQR';
+    function loadQR(){
+      const link = localStorage.getItem(QR_KEY) || '#';
+      qrLink.href = link; qrLink2.href = link; qrInput.value = link !== '#' ? link : '';
+    }
+
+    saveQr.addEventListener('click', ()=>{
+      const link = qrInput.value.trim() || '#';
+      localStorage.setItem(QR_KEY, link);
+      loadQR();
+      alert('Mission Board link saved!');
+    });
+
+    const scoresBody = document.querySelector('#scores tbody');
+    const NAME_KEY = 'ecoSudokuScores';
+    function loadScores(){
+      const data = JSON.parse(localStorage.getItem(NAME_KEY)||'[]');
+      renderScores(data);
+    }
+    function renderScores(data){
+      scoresBody.innerHTML='';
+      data.slice(0,10).forEach((row,i)=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${i+1}</td><td>${row.name}</td><td>${row.time}</td>`;
+        scoresBody.appendChild(tr);
+      });
+    }
+    document.getElementById('saveScore').addEventListener('click', ()=>{
+      const name = (document.getElementById('playerName').value||'Visitor').slice(0,32);
+      const time = document.getElementById('timer').textContent;
+      const data = JSON.parse(localStorage.getItem(NAME_KEY)||'[]');
+      data.push({name, time});
+      data.sort((a,b)=> a.time.localeCompare(b.time));
+      localStorage.setItem(NAME_KEY, JSON.stringify(data));
+      renderScores(data);
+    });
+
+    const pledgesUl = document.getElementById('pledges');
+    const PLEDGE_KEY = 'ecoSudokuPledges';
+    function loadPledges(){
+      const list = JSON.parse(localStorage.getItem(PLEDGE_KEY)||'[]');
+      pledgesUl.innerHTML='';
+      list.forEach(txt=>{
+        const li=document.createElement('li'); li.textContent = `• ${txt}`; pledgesUl.appendChild(li);
+      });
+    }
+    document.getElementById('addPledge').addEventListener('click', ()=>{
+      const txt = (document.getElementById('pledgeText').value||'').trim();
+      if(!txt) return; document.getElementById('pledgeText').value='';
+      const list = JSON.parse(localStorage.getItem(PLEDGE_KEY)||'[]');
+      list.unshift(txt); localStorage.setItem(PLEDGE_KEY, JSON.stringify(list.slice(0,50)));
+      loadPledges();
+    });
+
+    document.getElementById('checkBtn').addEventListener('click', check);
+    document.getElementById('hintBtn').addEventListener('click', giveHint);
+    document.getElementById('resetBtn').addEventListener('click', ()=>{ mistakes=0; document.getElementById('mistakes').textContent='0'; buildBoard(); startTimer(); });
+    document.getElementById('clearErrorsBtn').addEventListener('click', clearErrors);
+    document.getElementById('closeModal').addEventListener('click', ()=> document.getElementById('modal').classList.remove('active'));
+
+    function init(){
+      buildPalette();
+      buildBoard();
+      startTimer();
+      loadQR();
+      loadScores();
+      loadPledges();
+    }
+    init();
+  </script>
+</body>
+</html>
